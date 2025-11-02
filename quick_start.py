@@ -8,8 +8,10 @@ This script demonstrates the basic usage of the flower classification project.
 import os
 import sys
 
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path - works regardless of where script is run from
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 import config
 from src.data_utils import load_data, preprocess_data, split_data, create_sample_data
