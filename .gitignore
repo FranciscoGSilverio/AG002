@@ -205,3 +205,19 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project specific
+# Trained models (can be large)
+models/*.pkl
+models/*.joblib
+models/*.h5
+
+# Generated data files
+data/*.csv
+data/*.xlsx
+
+# Results and visualizations
+results/*.png
+results/*.jpg
+results/*.pdf
+results/*.html
