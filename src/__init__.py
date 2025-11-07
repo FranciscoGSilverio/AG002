@@ -9,6 +9,5 @@ __author__ = 'Francisco G. Silverio'
 
 from . import data_utils
 from . import model_utils
-from . import visualization
 
-__all__ = ['data_utils', 'model_utils', 'visualization']
+__all__ = ['data_utils', 'model_utils']

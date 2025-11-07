@@ -1,10 +1,3 @@
-"""
-Main script for training flower species classification model.
-
-This script loads the iris dataset, preprocesses it, trains multiple classifiers,
-and saves the best performing model.
-"""
-
 import sys
 import os
 
@@ -15,17 +8,12 @@ if PROJECT_ROOT not in sys.path:
 
 import config
 from src.data_utils import (
-    load_data, explore_data, preprocess_data, split_data, create_sample_data
+    load_data, explore_data, preprocess_data, split_data
 )
 from src.model_utils import (
-    create_classifier, train_model, evaluate_model, 
-    cross_validate_model, save_model
-)
-from src.visualization import (
-    plot_feature_distributions, plot_correlation_matrix,
-    plot_pairplot, plot_confusion_matrix, plot_feature_importance
-)
-
+    create_classifier, save_model_and_scaler, train_model, evaluate_model, 
+    cross_validate_model, predict_iris
+) 
 
 def main():
     """Main training pipeline."""
@@ -33,52 +21,28 @@ def main():
     print("FLOWER SPECIES CLASSIFICATION - MODEL TRAINING")
     print("=" * 60)
     
-    # Step 1: Create sample data if it doesn't exist
-    if not os.path.exists(config.RAW_DATA_PATH):
-        print("\nCreating sample iris dataset...")
-        create_sample_data(config.RAW_DATA_PATH)
-    
-    # Step 2: Load data
+    # Load data
     print("\nLoading data...")
     df = load_data(config.RAW_DATA_PATH)
     
-    # Step 3: Explore data
+    # Explore data
     explore_data(df)
-    
-    # Step 4: Create visualizations
-    print("\n" + "=" * 60)
-    print("Creating visualizations...")
-    try:
-        plot_correlation_matrix(
-            df, 
-            save_path=os.path.join(config.RESULTS_DIR, 'correlation_matrix.png')
-        )
-        plot_feature_distributions(
-            df,
-            save_path=os.path.join(config.RESULTS_DIR, 'feature_distributions.png')
-        )
-        print("Visualizations saved to results directory")
-    except Exception as e:
-        print(f"Warning: Could not create visualizations: {e}")
-    
-    # Step 5: Preprocess data
+
+    # Preprocess data
     print("\n" + "=" * 60)
     print("Preprocessing data...")
     X, y, scaler = preprocess_data(df, scale_features=True)
-    
-    # Step 6: Split data
+
+    # Split data
     X_train, X_test, y_train, y_test = split_data(X, y)
-    
-    # Step 7: Train multiple models and compare
+
+    # Train multiple models and compare
     print("\n" + "=" * 60)
     print("Training multiple models...")
     
     models_to_try = {
         'Random Forest': 'random_forest',
-        'Logistic Regression': 'logistic_regression',
-        'SVM': 'svm',
         'K-Nearest Neighbors': 'knn',
-        'Decision Tree': 'decision_tree'
     }
     
     results = {}
@@ -94,13 +58,13 @@ def main():
         trained_models[model_name] = model
         
         # Evaluate model
-        metrics = evaluate_model(model, X_test, y_test, detailed=True)
+        metrics = evaluate_model(model, X_test, y_test, detailed=True, model_name=model_name)
         results[model_name] = metrics
         
         # Cross-validation
-        cv_results = cross_validate_model(model, X_train, y_train)
-    
-    # Step 8: Select best model
+        cross_validate_model(model, X_train, y_train)
+
+    # Select best model
     print("\n" + "=" * 60)
     print("MODEL COMPARISON SUMMARY")
     print("=" * 60)
@@ -121,38 +85,22 @@ def main():
     print(f"Accuracy: {best_accuracy:.4f}")
     print("=" * 60)
     
-    # Step 9: Save best model
-    print(f"\nSaving best model...")
-    save_model(best_model, config.MODEL_PATH)
-    
-    # Step 10: Create final visualizations
-    print("\nCreating final visualizations...")
-    try:
-        # Confusion matrix for best model
-        y_pred = best_model.predict(X_test)
-        plot_confusion_matrix(
-            y_test, 
-            y_pred,
-            labels=sorted(y_test.unique()),
-            save_path=os.path.join(config.RESULTS_DIR, 'confusion_matrix.png')
-        )
-        
-        # Feature importance (if available)
-        if hasattr(best_model, 'feature_importances_'):
-            plot_feature_importance(
-                best_model,
-                config.FEATURE_COLUMNS,
-                save_path=os.path.join(config.RESULTS_DIR, 'feature_importance.png')
-            )
-    except Exception as e:
-        print(f"Warning: Could not create final visualizations: {e}")
-    
     print("\n" + "=" * 60)
     print("TRAINING COMPLETED SUCCESSFULLY!")
-    print("=" * 60)
-    print(f"\nModel saved to: {config.MODEL_PATH}")
-    print(f"Results saved to: {config.RESULTS_DIR}")
+    
+    # Step 8: Save best model and scaler
+    print("\nSaving best model and scaler...")
+    save_model_and_scaler(best_model, scaler)
+    
+    print("\nPlease enter features to make a prediction:")
+    sepal_length = float(input("Sepal Length: "))
+    sepal_width  = float(input("Sepal Width: "))
+    petal_length = float(input("Petal Length: "))
+    petal_width  = float(input("Petal Width: "))
+    
+    species =  predict_iris(sepal_length, sepal_width, petal_length, petal_width)
 
+    print("Predicted species:", species)
 
 if __name__ == "__main__":
     main()

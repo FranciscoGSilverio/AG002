@@ -2,29 +2,29 @@
 Model training and evaluation utilities for flower species classification.
 """
 
+import os
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import cross_val_score, GridSearchCV
+from sklearn.model_selection import cross_val_score
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    classification_report, confusion_matrix
+    accuracy_score, confusion_matrix, precision_score, recall_score, f1_score,
+    classification_report
 )
-import pickle
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 import config
-
+import joblib
+from config import MODELS_DIR
 
 def create_classifier(model_type: str = 'random_forest', **kwargs) -> Any:
     """
     Create a classifier model.
     
     Args:
-        model_type: Type of classifier ('random_forest', 'logistic_regression', 'svm', 'knn', 'decision_tree')
+        model_type: Type of classifier ('random_forest', 'knn')
         **kwargs: Additional parameters for the classifier
         
     Returns:
@@ -32,10 +32,7 @@ def create_classifier(model_type: str = 'random_forest', **kwargs) -> Any:
     """
     models = {
         'random_forest': RandomForestClassifier(random_state=config.RANDOM_STATE, **kwargs),
-        'logistic_regression': LogisticRegression(random_state=config.RANDOM_STATE, max_iter=1000, **kwargs),
-        'svm': SVC(random_state=config.RANDOM_STATE, **kwargs),
         'knn': KNeighborsClassifier(**kwargs),
-        'decision_tree': DecisionTreeClassifier(random_state=config.RANDOM_STATE, **kwargs)
     }
     
     if model_type not in models:
@@ -62,12 +59,15 @@ def train_model(model: Any, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
     return model
 
 
-def evaluate_model(model: Any, 
-                  X_test: pd.DataFrame, 
-                  y_test: pd.Series,
-                  detailed: bool = True) -> Dict[str, float]:
+def evaluate_model(
+    model: Any, 
+    X_test: pd.DataFrame, 
+    y_test: pd.Series,
+    detailed: bool = True,
+    model_name: str = "model"
+) -> Dict[str, float]:
     """
-    Evaluate a trained model on test data.
+    Evaluate a trained model on test data and save confusion matrix plot.
     
     Args:
         model: Trained classifier
@@ -78,9 +78,10 @@ def evaluate_model(model: Any,
     Returns:
         Dictionary containing evaluation metrics
     """
+
     # Make predictions
     y_pred = model.predict(X_test)
-    
+
     # Calculate metrics
     metrics = {
         'accuracy': accuracy_score(y_test, y_pred),
@@ -88,20 +89,47 @@ def evaluate_model(model: Any,
         'recall': recall_score(y_test, y_pred, average='weighted'),
         'f1_score': f1_score(y_test, y_pred, average='weighted')
     }
-    
+
+    # Print metrics
     if detailed:
         print("\n=== Model Evaluation ===")
         print(f"Accuracy: {metrics['accuracy']:.4f}")
         print(f"Precision: {metrics['precision']:.4f}")
         print(f"Recall: {metrics['recall']:.4f}")
         print(f"F1 Score: {metrics['f1_score']:.4f}")
-        
+
         print("\n=== Classification Report ===")
         print(classification_report(y_test, y_pred))
-        
+
         print("\n=== Confusion Matrix ===")
         print(confusion_matrix(y_test, y_pred))
-    
+
+    # === Save confusion matrix plot ===
+    try:
+        cm = confusion_matrix(y_test, y_pred)
+        labels = sorted(y_test.unique())
+
+        plt.figure(figsize=(6, 5))
+        sns.heatmap(
+            cm, annot=True, fmt="d",
+            cmap="Blues",
+            xticklabels=labels,
+            yticklabels=labels
+        )
+        plt.xlabel("Predicted")
+        plt.ylabel("True")
+        plt.title("Confusion Matrix - " + model_name)
+
+        save_path = os.path.join(config.METRICS_DIR, f"confusion_matrix_{model_name}.png")
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
+
+        if detailed:
+            print(f"\nConfusion matrix saved to: {save_path}")
+
+    except Exception as e:
+        print(f"Warning: Could not save confusion matrix plot: {e}")
+
     return metrics
 
 
@@ -139,72 +167,6 @@ def cross_validate_model(model: Any,
     return results
 
 
-def hyperparameter_tuning(model_type: str,
-                         X_train: pd.DataFrame,
-                         y_train: pd.Series,
-                         param_grid: Dict[str, list]) -> Tuple[Any, Dict[str, Any]]:
-    """
-    Perform hyperparameter tuning using GridSearchCV.
-    
-    Args:
-        model_type: Type of classifier
-        X_train: Training features
-        y_train: Training labels
-        param_grid: Dictionary of parameters to search
-        
-    Returns:
-        Tuple of (best model, best parameters)
-    """
-    print(f"\nPerforming hyperparameter tuning for {model_type}...")
-    
-    base_model = create_classifier(model_type)
-    
-    grid_search = GridSearchCV(
-        base_model,
-        param_grid,
-        cv=config.N_SPLITS,
-        scoring='accuracy',
-        n_jobs=-1,
-        verbose=1
-    )
-    
-    grid_search.fit(X_train, y_train)
-    
-    print(f"\nBest parameters: {grid_search.best_params_}")
-    print(f"Best cross-validation score: {grid_search.best_score_:.4f}")
-    
-    return grid_search.best_estimator_, grid_search.best_params_
-
-
-def save_model(model: Any, filepath: str) -> None:
-    """
-    Save a trained model to disk.
-    
-    Args:
-        model: Trained model to save
-        filepath: Path where to save the model
-    """
-    with open(filepath, 'wb') as f:
-        pickle.dump(model, f)
-    print(f"Model saved to {filepath}")
-
-
-def load_model(filepath: str) -> Any:
-    """
-    Load a trained model from disk.
-    
-    Args:
-        filepath: Path to the saved model
-        
-    Returns:
-        Loaded model object
-    """
-    with open(filepath, 'rb') as f:
-        model = pickle.load(f)
-    print(f"Model loaded from {filepath}")
-    return model
-
-
 def predict(model: Any, X: pd.DataFrame) -> np.ndarray:
     """
     Make predictions using a trained model.
@@ -219,20 +181,41 @@ def predict(model: Any, X: pd.DataFrame) -> np.ndarray:
     predictions = model.predict(X)
     return predictions
 
-
-def predict_proba(model: Any, X: pd.DataFrame) -> np.ndarray:
+def save_model_and_scaler(model: Any, scaler: Any) -> None:
     """
-    Get prediction probabilities from a trained model.
+    Save the trained model and scaler to disk.
     
     Args:
         model: Trained classifier
-        X: Features to predict
-        
-    Returns:
-        Array of prediction probabilities
+        scaler: Fitted scaler
+        model_path: Path to save the model
+        scaler_path: Path to save the scaler
     """
-    if hasattr(model, 'predict_proba'):
-        probabilities = model.predict_proba(X)
-        return probabilities
-    else:
-        raise AttributeError(f"{type(model).__name__} does not support probability predictions")
+
+    joblib.dump(model, os.path.join(MODELS_DIR, "best_model.pkl"))
+    joblib.dump(scaler, os.path.join(MODELS_DIR, "scaler.pkl"))
+    print(f"Model saved to {os.path.join(MODELS_DIR, 'best_model.pkl')}")
+    print(f"Scaler saved to {os.path.join(MODELS_DIR, 'scaler.pkl')}")
+    
+    
+def predict_iris(sepal_length, sepal_width, petal_length, petal_width):
+    # load artifacts
+    model = joblib.load(os.path.join(config.MODELS_DIR, "best_model.pkl"))
+    scaler = joblib.load(os.path.join(config.MODELS_DIR, "scaler.pkl"))
+
+    # format input
+    X = pd.DataFrame([{
+        "sepal_length": sepal_length,
+        "sepal_width": sepal_width,
+        "petal_length": petal_length,
+        "petal_width": petal_width
+    }])
+
+    # scale features
+    X_scaled = scaler.transform(X)
+    X_scaled = pd.DataFrame(X_scaled, columns=config.FEATURE_COLUMNS, index=X.index)
+
+    # predict
+    y_pred = predict(model, X_scaled)
+
+    return y_pred[0]

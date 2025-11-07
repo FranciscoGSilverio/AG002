@@ -3,7 +3,6 @@ Data loading and preprocessing utilities for flower species classification.
 """
 
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from typing import Tuple, Optional
@@ -49,8 +48,6 @@ def explore_data(df: pd.DataFrame) -> None:
 
 
 def preprocess_data(df: pd.DataFrame, 
-                   feature_columns: Optional[list] = None,
-                   target_column: Optional[str] = None,
                    scale_features: bool = True) -> Tuple[pd.DataFrame, pd.Series, Optional[StandardScaler]]:
     """
     Preprocess the data by handling missing values and scaling features.
@@ -67,10 +64,8 @@ def preprocess_data(df: pd.DataFrame,
     df = df.copy()
     
     # Use config defaults if not provided
-    if feature_columns is None:
-        feature_columns = config.FEATURE_COLUMNS
-    if target_column is None:
-        target_column = config.TARGET_COLUMN
+    feature_columns = config.FEATURE_COLUMNS
+    target_column = config.TARGET_COLUMN
     
     # Handle missing values (simple strategy: drop rows with missing values)
     initial_rows = len(df)
@@ -95,9 +90,7 @@ def preprocess_data(df: pd.DataFrame,
 
 
 def split_data(X: pd.DataFrame, 
-               y: pd.Series, 
-               test_size: float = None,
-               random_state: int = None) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+               y: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     """
     Split data into training and testing sets.
     
@@ -110,10 +103,8 @@ def split_data(X: pd.DataFrame,
     Returns:
         Tuple of (X_train, X_test, y_train, y_test)
     """
-    if test_size is None:
-        test_size = config.TEST_SIZE
-    if random_state is None:
-        random_state = config.RANDOM_STATE
+    test_size = config.TEST_SIZE
+    random_state = config.RANDOM_STATE
         
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
@@ -124,28 +115,3 @@ def split_data(X: pd.DataFrame,
     print(f"Testing set size: {len(X_test)}")
     
     return X_train, X_test, y_train, y_test
-
-
-def create_sample_data(output_path: str) -> None:
-    """
-    Create a sample iris dataset CSV file.
-    
-    Args:
-        output_path: Path where to save the CSV file
-    """
-    from sklearn.datasets import load_iris
-    
-    # Load iris dataset
-    iris = load_iris()
-    
-    # Create DataFrame
-    df = pd.DataFrame(iris.data, columns=['sepal_length', 'sepal_width', 'petal_length', 'petal_width'])
-    df['species'] = iris.target
-    
-    # Map target numbers to species names
-    species_map = {0: 'setosa', 1: 'versicolor', 2: 'virginica'}
-    df['species'] = df['species'].map(species_map)
-    
-    # Save to CSV
-    df.to_csv(output_path, index=False)
-    print(f"Sample iris dataset created at {output_path}")
